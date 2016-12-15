@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 from keras.engine import Layer, InputSpec
+from keras.layers import Activation, Dense, Reshape
+from keras.layers.convolutional import Convolution2D
 from keras import initializations, regularizers
 from keras import backend as K
 
@@ -147,3 +149,34 @@ class MultiBatchNorm(Layer):
                   'momentum': self.momentum}
         base_config = super(MultiBatchNorm, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
+
+def multibn_block(x, num, mode='conv'):
+    c_in = int(x.get_shape()[-1])
+    
+    if mode == 'conv':
+        w_in = int(x.get_shape()[1])
+        h_in = int(x.get_shape()[2])
+        
+        filter_shape = (1, 1, c_in, num)
+        filter_init = np.random.standard_normal(filter_shape).astype(np.float32)
+        filter_init = filter_init * np.sqrt(2.0 / c_in)
+        bias_init = np.ones((num,), dtype=np.float32) * w_bias_init
+        
+        w = Convolution2D(num, 1, 1, W_regularizer=l2(weight_decay),
+                          weights=[filter_init, bias_init])(x)
+        
+        w_flat = Reshape((w_in * h_in, num))(w)
+        w_sm = Activation('softmax')(w_flat)
+        w_ext = Reshape((w_in, h_in, num))(w_sm)
+        
+        return MultiBatchNorm(num=num)([x, w_ext])
+    elif mode == 'fc':
+        filter_shape = (c_in, num)
+        filter_init = np.random.standard_normal(filter_shape).astype(np.float32)
+        filter_init = filter_init * np.sqrt(2.0 / c_in)
+        bias_init = np.ones((num,), dtype=np.float32) * w_bias_init
+        
+        w = Dense(num, activation='softmax', W_regularizer=l2(weight_decay),
+                  weights=[filter_init, bias_init])(x)
+        
+        return MultiBatchNorm(num=num)([x, w])
