@@ -6,8 +6,7 @@ from keras import initializations, regularizers
 from keras import backend as K
 
 import numpy as np
-
-from tensorflow.nn import softmax
+import tensorflow as tf
 
 class MultiBatchNorm(Layer):
     def __init__(self, num=3, epsilon=1e-3, momentum=0.99, weights=None,
@@ -75,7 +74,7 @@ class MultiBatchNorm(Layer):
         del reduction_axes[-1]
         
         # Calculate mean and std
-        in_sm = softmax(inputs[1], -1)
+        in_sm = tf.nn.softmax(inputs[1], -1)
         W = K.expand_dims(in_sm, len(input_shape) - 1)
         X = K.expand_dims(inputs[0], -1)
         W_sum = K.sum(in_sm, reduction_axes)
@@ -107,7 +106,7 @@ class MultiBatchNorm(Layer):
         base_config = super(MultiBatchNorm, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
-def multibn_block(x, num, bias=10, weight_decay=5e-4):
+def multibn_block(x, num, bias=10., weight_decay=5e-4):
     channels = int(x.get_shape()[-1])
     bias_init = np.ones((num,), dtype=np.float32) * bias
     
@@ -117,7 +116,7 @@ def multibn_block(x, num, bias=10, weight_decay=5e-4):
         filter_init = np.random.standard_normal(filter_shape).astype(np.float32)
         filter_init = filter_init * np.sqrt(2.0 / channels)
         
-        w = Convolution2D(num, 1, 1, W_regularizer=l2(weight_decay),
+        w = Convolution2D(num, 1, 1, W_regularizer=regularizers.l2(weight_decay),
                           weights=[filter_init, bias_init])(x)
     else:
         # Fully connected mode
@@ -125,7 +124,7 @@ def multibn_block(x, num, bias=10, weight_decay=5e-4):
         filter_init = np.random.standard_normal(filter_shape).astype(np.float32)
         filter_init = filter_init * np.sqrt(2.0 / channels)
         
-        w = Dense(num, W_regularizer=l2(weight_decay),
+        w = Dense(num, W_regularizer=regularizers.l2(weight_decay),
                   weights=[filter_init, bias_init])(x)
     
     return MultiBatchNorm(num=num)([x, w])
