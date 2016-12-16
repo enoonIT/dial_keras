@@ -58,7 +58,7 @@ class MultiBatchNorm(Layer):
             s_shape, name='{}_running_mean'.format(self.name))
         self.running_std = K.ones(
             s_shape, name='{}_running_std'.format(self.name))
-        self.non_trainable_weights.append([self.running_mean, self.running_std])
+        self.non_trainable_weights = [self.running_mean, self.running_std]
         
         if self.initial_weights is not None:
             self.set_weights(self.initial_weights)
