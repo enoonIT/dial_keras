@@ -2,7 +2,7 @@ import caffe
 import lmdb
 import PIL.Image
 from StringIO import StringIO
-from keras.preprocessing.image import Iterator
+from keras.preprocessing.image import Iterator, img_to_array, ImageDataGenerator
 import numpy as np
 from keras import backend as K
 
@@ -17,18 +17,35 @@ def read_lmdb(lmdb_file):
         yield np.array(PIL.Image.open(s)), datum.label
 
 
+
+class AImageDataGenerator(ImageDataGenerator):
+    def flow_from_lmdb(self, lmdb_path,
+                            target_size=(256, 256), color_mode='rgb',
+                            nb_class=0, class_mode='categorical',
+                            batch_size=32, shuffle=True, seed=None,
+                            save_to_dir=None, save_prefix='', save_format='jpeg',
+                            follow_links=False):
+        return LmdbIterator(
+            lmdb_path, self,
+            target_size=target_size, color_mode=color_mode,
+            nb_class=nb_class, class_mode=class_mode,
+            dim_ordering=self.dim_ordering,
+            batch_size=batch_size, shuffle=shuffle, seed=seed,
+            save_to_dir=save_to_dir, save_prefix=save_prefix, save_format=save_format)
+
+
 class LmdbIterator(Iterator):
 
     def __init__(self, lmdb_path, image_data_generator,
                  target_size=(256, 256), color_mode='rgb',
                  dim_ordering='default',
-                 nb_classes=None, class_mode='categorical',
+                 nb_class=None, class_mode='categorical',
                  batch_size=32, shuffle=True, seed=None,
                  save_to_dir=None, save_prefix='', save_format='jpeg'):
         if dim_ordering == 'default':
             dim_ordering = K.image_dim_ordering()
         self.lmdb = read_lmdb(lmdb_path)
-        self.nb_class = nb_classes
+        self.nb_class = nb_class
         self.lmdb_path = lmdb_path
         self.image_data_generator = image_data_generator
         self.target_size = tuple(target_size)
@@ -47,7 +64,6 @@ class LmdbIterator(Iterator):
                 self.image_shape = self.target_size + (1,)
             else:
                 self.image_shape = (1,) + self.target_size
-        self.classes = classes
         if class_mode not in {'categorical', 'binary', 'sparse', None}:
             raise ValueError('Invalid class_mode:', class_mode,
                              '; expected one of "categorical", '
@@ -60,7 +76,9 @@ class LmdbIterator(Iterator):
         white_list_formats = {'png', 'jpg', 'jpeg', 'bmp'}
 
         # first, count the number of samples and classes
-        # TODO
+        lmdb_env = lmdb.open(self.lmdb_path)
+        self.nb_sample = lmdb_env.stat()["entries"]
+        lmdb_env.close()
         super(LmdbIterator, self).__init__(self.nb_sample, batch_size, shuffle, seed)
 
     def next(self):
@@ -98,7 +116,7 @@ class LmdbIterator(Iterator):
             raise NotImplementedError("TODO")
         elif self.class_mode == 'categorical':
             batch_y = np.zeros((len(batch_x), self.nb_class), dtype='float32')
-            for i, label in enumerate(self.classes[labels]):
+            for i, label in enumerate(labels):
                 batch_y[i, label] = 1.
         else:
             return batch_x
