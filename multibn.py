@@ -8,6 +8,7 @@ from keras import backend as K
 import numpy as np
 import tensorflow as tf
 
+
 class MultiBatchNorm(Layer):
     def __init__(self, num=3, epsilon=1e-3, momentum=0.99, weights=None,
                  beta_init='zero', gamma_init='one', gamma_regularizer=None,
@@ -84,10 +85,9 @@ class MultiBatchNorm(Layer):
         std = K.sum(W * x_minus_mean_sq, reduction_axes) / W_sum
         
         # Running updates
-        self.add_updates(
-            [K.moving_average_update(self.running_mean, mean, self.momentum),
-             K.moving_average_update(self.running_std, std, self.momentum)],
-            inputs)
+    self.add_updates(
+        [K.moving_average_update(self.running_mean, mean, self.momentum),
+         K.moving_average_update(self.running_std, std, self.momentum)], inputs)
         
         xn = (X - K.in_train_phase(mean, self.running_mean)) / \
             K.sqrt(K.in_train_phase(std, self.running_std) + self.epsilon)
@@ -105,6 +105,7 @@ class MultiBatchNorm(Layer):
                   'momentum': self.momentum}
         base_config = super(MultiBatchNorm, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
+
 
 def multibn_block(x, num, bias=10., weight_decay=5e-4):
     channels = int(x.get_shape()[-1])

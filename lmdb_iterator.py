@@ -24,12 +24,12 @@ class AImageDataGenerator(ImageDataGenerator):
                             nb_class=0, class_mode='categorical',
                             batch_size=32, shuffle=True, seed=None,
                             save_to_dir=None, save_prefix='', save_format='jpeg',
-                            follow_links=False):
+                            center_crop=False):
         return LmdbIterator(
             lmdb_path, self,
             target_size=target_size, color_mode=color_mode,
             nb_class=nb_class, class_mode=class_mode,
-            dim_ordering=self.dim_ordering,
+            dim_ordering=self.dim_ordering, center_crop=center_crop,
             batch_size=batch_size, shuffle=shuffle, seed=seed,
             save_to_dir=save_to_dir, save_prefix=save_prefix, save_format=save_format)
 
@@ -37,8 +37,8 @@ class AImageDataGenerator(ImageDataGenerator):
 class LmdbIterator(Iterator):
 
     def __init__(self, lmdb_path, image_data_generator,
-                 target_size=(256, 256), color_mode='rgb',
-                 dim_ordering='default',
+                 target_size=(227,227), color_mode='rgb',
+                 dim_ordering='default', center_crop=False,
                  nb_class=None, class_mode='categorical',
                  batch_size=32, shuffle=True, seed=None,
                  save_to_dir=None, save_prefix='', save_format='jpeg'):
@@ -49,6 +49,7 @@ class LmdbIterator(Iterator):
         self.lmdb_path = lmdb_path
         self.image_data_generator = image_data_generator
         self.target_size = tuple(target_size)
+        self.center_crop = center_crop
         if color_mode not in {'rgb', 'grayscale'}:
             raise ValueError('Invalid color mode:', color_mode,
                              '; expected "rgb" or "grayscale".')
@@ -79,6 +80,7 @@ class LmdbIterator(Iterator):
         lmdb_env = lmdb.open(self.lmdb_path)
         self.nb_sample = lmdb_env.stat()["entries"]
         lmdb_env.close()
+        print("Found %d samples in lmdb" % self.nb_sample)
         super(LmdbIterator, self).__init__(self.nb_sample, batch_size, shuffle, seed)
 
     def next(self):
@@ -95,6 +97,15 @@ class LmdbIterator(Iterator):
                 self.lmdb = read_lmdb(self.lmdb_path)
                 d = next(self.lmdb, None)
             (img, label)  = d
+            wh = np.array(img.shape[:-1]) - np.array(self.target_size)
+            wh[wh<0]=0
+            if self.center_crop:
+                offX = wh[0]/2
+                offY = wh[1]/2
+            else:
+                offX = np.random.randint(wh[0])
+                offY = np.random.randint(wh[1])
+            img = img[offX:offX+self.target_size[0], offY:offY+self.target_size[1], :]
             x = img_to_array(img, dim_ordering=self.dim_ordering)
             x = self.image_data_generator.random_transform(x)
             x = self.image_data_generator.standardize(x)
