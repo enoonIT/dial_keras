@@ -6,6 +6,7 @@ from keras.preprocessing.image import Iterator, img_to_array, ImageDataGenerator
 import numpy as np
 from keras import backend as K
 
+
 def read_lmdb(lmdb_file):
     cursor = lmdb.open(lmdb_file, readonly=True).begin().cursor()
     datum = caffe.proto.caffe_pb2.Datum()
@@ -17,14 +18,13 @@ def read_lmdb(lmdb_file):
         yield np.array(PIL.Image.open(s)), datum.label
 
 
-
 class AImageDataGenerator(ImageDataGenerator):
     def flow_from_lmdb(self, lmdb_path,
-                            target_size=(256, 256), color_mode='rgb',
-                            nb_class=0, class_mode='categorical',
-                            batch_size=32, shuffle=True, seed=None,
-                            save_to_dir=None, save_prefix='', save_format='jpeg',
-                            center_crop=False):
+                       target_size=(256, 256), color_mode='rgb',
+                       nb_class=0, class_mode='categorical',
+                       batch_size=32, shuffle=True, seed=None,
+                       save_to_dir=None, save_prefix='', save_format='jpeg',
+                       center_crop=False):
         return LmdbIterator(
             lmdb_path, self,
             target_size=target_size, color_mode=color_mode,
@@ -37,7 +37,7 @@ class AImageDataGenerator(ImageDataGenerator):
 class LmdbIterator(Iterator):
 
     def __init__(self, lmdb_path, image_data_generator,
-                 target_size=(227,227), color_mode='rgb',
+                 target_size=None, color_mode='rgb',
                  dim_ordering='default', center_crop=False,
                  nb_class=None, class_mode='categorical',
                  batch_size=32, shuffle=True, seed=None,

@@ -43,16 +43,16 @@ def roundUp(number, multiple):
 def step_decay(epoch):
     initial_lrate = 0.01
     drop = 0.1
-    epochs_drop = 20.0
+    epochs_drop = 10.0
     lrate = initial_lrate * math.pow(drop, math.floor((1+epoch)/epochs_drop))
     print("Current LR: %f" % lrate)
     return lrate
 
 
 args = get_args()
-batch_size = 100  # 256
-v_batch_size = 50  # 100
-image_size = 227
+batch_size = 32  # 256
+v_batch_size = 10  # 100
+image_size = 224
 scaleFactor = 1  # 1./255
 train_datagen = AImageDataGenerator(
             featurewise_center=True,
@@ -66,9 +66,10 @@ train_datagen = AImageDataGenerator(
 test_datagen = AImageDataGenerator(rescale=scaleFactor, featurewise_center=True)
 
 stats_datagen = AImageDataGenerator(rescale=scaleFactor)
-tmp = stats_datagen.flow_from_lmdb(args.val_folder,
+tmp = stats_datagen.flow_from_lmdb(args.train_folder,
                                    target_size=(image_size, image_size), class_mode="categorical",
-                                   batch_size=500, nb_class=args.nb_class)
+                                   batch_size=5000, nb_class=args.nb_class)
+
 print("Loading samples for stats")
 sample_data = tmp.next()[0]
 train_datagen.fit(sample_data)
@@ -87,7 +88,8 @@ validation_generator = test_datagen.flow_from_lmdb(
             class_mode='categorical', center_crop=True)
 
 # model = bn_alexnet.MultiBNAlexNet(n_classes=train_generator.nb_class)
-model = bn_alexnet.AlexNet(n_classes=train_generator.nb_class)
+# model = bn_alexnet.AlexNet(n_classes=train_generator.nb_class)
+model = bn_alexnet.vgg_like(n_classes=args.nb_class, multibn_layer=False)
 
 lrate = LearningRateScheduler(step_decay)
 savename = args.savename + "_weights.hdf5"
@@ -101,7 +103,7 @@ samples_per_epoch = roundUp(train_generator.nb_sample, batch_size)
 model.fit_generator(
             train_generator,
             samples_per_epoch=samples_per_epoch,
-            nb_epoch=60,
+            nb_epoch=30,
             validation_data=validation_generator,
             nb_val_samples=roundUp(validation_generator.nb_sample, v_batch_size),
             callbacks=[lrate, checkpointer])

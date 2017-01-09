@@ -83,11 +83,10 @@ class MultiBatchNorm(Layer):
         mean = K.sum(W * X, reduction_axes) / W_sum
         x_minus_mean_sq = (X - mean) ** 2
         std = K.sum(W * x_minus_mean_sq, reduction_axes) / W_sum
-        
         # Running updates
-    self.add_updates(
-        [K.moving_average_update(self.running_mean, mean, self.momentum),
-         K.moving_average_update(self.running_std, std, self.momentum)], inputs)
+        self.add_update(
+            [K.moving_average_update(self.running_mean, mean, self.momentum),
+             K.moving_average_update(self.running_std, std, self.momentum)], inputs)
         
         xn = (X - K.in_train_phase(mean, self.running_mean)) / \
             K.sqrt(K.in_train_phase(std, self.running_std) + self.epsilon)
@@ -108,10 +107,10 @@ class MultiBatchNorm(Layer):
 
 
 def multibn_block(x, num, bias=10., weight_decay=5e-4):
-    channels = int(x.get_shape()[-1])
+    channels = K.int_shape(x)[-1]
     bias_init = np.ones((num,), dtype=np.float32) * bias
     
-    if len(x.get_shape()) == 4:
+    if len(K.int_shape(x)) == 4:
         # Convolutional mode
         filter_shape = (1, 1, channels, num)
         filter_init = np.random.standard_normal(filter_shape).astype(np.float32)
@@ -121,6 +120,7 @@ def multibn_block(x, num, bias=10., weight_decay=5e-4):
                           weights=[filter_init, bias_init])(x)
     else:
         # Fully connected mode
+        print("Fully connected mode, %d channels" % channels)
         filter_shape = (channels, num)
         filter_init = np.random.standard_normal(filter_shape).astype(np.float32)
         filter_init = filter_init * np.sqrt(2.0 / channels)
