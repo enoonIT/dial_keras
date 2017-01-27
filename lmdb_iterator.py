@@ -96,9 +96,9 @@ class LmdbIterator(Iterator):
             if d is None:
                 self.lmdb = read_lmdb(self.lmdb_path)
                 d = next(self.lmdb, None)
-            (img, label)  = d
+            (img, label) = d
             wh = np.array(img.shape[:-1]) - np.array(self.target_size)
-            wh[wh<0]=0
+            wh[wh < 0] = 0
             if self.center_crop:
                 offX = wh[0]/2
                 offY = wh[1]/2

@@ -37,24 +37,18 @@ class MultiBatchNorm(Layer):
         if w_shape[-1] != self.num:
             raise ValueError(
                 'The number of weights per sample must match the num parameter')
-        
+
         self.input_spec = [InputSpec(shape=x_shape), InputSpec(shape=w_shape)]
         p_shape = (x_shape[-1],)
         s_shape = (x_shape[-1], self.num)
-        
-        self.gamma = self.gamma_init(p_shape, name='{}_gamma'.format(self.name))
-        self.beta = self.beta_init(p_shape, name='{}_beta'.format(self.name))
-        self.trainable_weights = [self.gamma, self.beta]
-        
-        self.regularizers = []
-        if self.gamma_regularizer:
-            self.gamma_regularizer.set_param(self.gamma)
-            self.regularizers.append(self.gamma_regularizer)
 
-        if self.beta_regularizer:
-            self.beta_regularizer.set_param(self.beta)
-            self.regularizers.append(self.beta_regularizer)
-        
+        self.gamma = self.add_weight(p_shape, initializer='one',
+                                     name='{}_gamma'.format(self.name),
+                                     regularizer=self.gamma_regularizer)
+        self.beta = self.add_weight(p_shape, initializer='zero',
+                                    name='{}_beta'.format(self.name),
+                                    regularizer=self.beta_regularizer)
+
         self.running_mean = K.zeros(
             s_shape, name='{}_running_mean'.format(self.name))
         self.running_std = K.ones(
@@ -64,8 +58,8 @@ class MultiBatchNorm(Layer):
         if self.initial_weights is not None:
             self.set_weights(self.initial_weights)
             del self.initial_weights
-        super(MultiBatchNorm, self).build(input_shape)
-    
+        self.built = True
+
     def call(self, inputs, mask=None):
         assert self.built, 'Layer must be built before being called'
         input_shape = self.input_spec[0].shape
@@ -95,18 +89,18 @@ class MultiBatchNorm(Layer):
     
     def get_output_shape_for(self, input_shape):
         return input_shape[0]
-    
-    def get_config(self):
-        config = {'num': self.num,
-                  'epsilon': self.epsilon,
-                  'gamma_regularizer': self.gamma_regularizer.get_config() if self.gamma_regularizer else None,
-                  'beta_regularizer': self.beta_regularizer.get_config() if self.beta_regularizer else None,
-                  'momentum': self.momentum}
-        base_config = super(MultiBatchNorm, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
+
+    # def get_config(self):
+    #     config = {'num': self.num,
+    #               'epsilon': self.epsilon,
+    #               'gamma_regularizer': self.gamma_regularizer.get_config() if self.gamma_regularizer else None,
+    #               'beta_regularizer': self.beta_regularizer.get_config() if self.beta_regularizer else None,
+    #               'momentum': self.momentum}
+    #     base_config = super(MultiBatchNorm, self).get_config()
+    #     return dict(list(base_config.items()) + list(config.items()))
 
 
-def multibn_block(x, num, bias=10., weight_decay=5e-4):
+def multibn_block(x, num, bias=10., weight_decay=5e-4, name=None):
     channels = K.int_shape(x)[-1]
     bias_init = np.ones((num,), dtype=np.float32) * bias
     
@@ -124,8 +118,8 @@ def multibn_block(x, num, bias=10., weight_decay=5e-4):
         filter_shape = (channels, num)
         filter_init = np.random.standard_normal(filter_shape).astype(np.float32)
         filter_init = filter_init * np.sqrt(2.0 / channels)
-        
+
         w = Dense(num, W_regularizer=regularizers.l2(weight_decay),
-                  weights=[filter_init, bias_init])(x)
+                  weights=[filter_init, bias_init], name="dense_" + name)(x)
     
-    return MultiBatchNorm(num=num)([x, w])
+    return MultiBatchNorm(num=num, name=name)([x, w])

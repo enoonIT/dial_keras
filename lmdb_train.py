@@ -50,15 +50,15 @@ def step_decay(epoch):
 
 
 args = get_args()
-batch_size = 32  # 256
-v_batch_size = 10  # 100
+batch_size = 32  # 32  # 256
+v_batch_size = 10  # 10  # 100
 image_size = 224
 scaleFactor = 1  # 1./255
 train_datagen = AImageDataGenerator(
             featurewise_center=True,
             rescale=scaleFactor,
-            width_shift_range=0.0,
-            height_shift_range=0.0,
+            width_shift_range=0.2,
+            height_shift_range=0.2,
             # shear_range=0.2,
             zoom_range=0.0,
             horizontal_flip=True)
@@ -68,7 +68,7 @@ test_datagen = AImageDataGenerator(rescale=scaleFactor, featurewise_center=True)
 stats_datagen = AImageDataGenerator(rescale=scaleFactor)
 tmp = stats_datagen.flow_from_lmdb(args.train_folder,
                                    target_size=(image_size, image_size), class_mode="categorical",
-                                   batch_size=5000, nb_class=args.nb_class)
+                                   batch_size=500, nb_class=args.nb_class)
 
 print("Loading samples for stats")
 sample_data = tmp.next()[0]
@@ -87,8 +87,7 @@ validation_generator = test_datagen.flow_from_lmdb(
             batch_size=v_batch_size, nb_class=args.nb_class,
             class_mode='categorical', center_crop=True)
 
-# model = bn_alexnet.MultiBNAlexNet(n_classes=train_generator.nb_class)
-# model = bn_alexnet.AlexNet(n_classes=train_generator.nb_class)
+# model = bn_alexnet.AlexNet(n_classes=train_generator.nb_class, multibn=False)
 model = bn_alexnet.vgg_like(n_classes=args.nb_class, multibn_layer=False)
 
 lrate = LearningRateScheduler(step_decay)
